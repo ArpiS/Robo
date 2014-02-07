@@ -1,0 +1,493 @@
+package edu.wpi.first.wpilibj.templates;
+
+import edu.wpi.first.wpilibj.CANJaguar;
+
+import edu.wpi.first.wpilibj.Compressor;
+
+import edu.wpi.first.wpilibj.DigitalInput;
+
+import edu.wpi.first.wpilibj.DoubleSolenoid;
+
+import edu.wpi.first.wpilibj.Gyro;
+
+import edu.wpi.first.wpilibj.Joystick;
+
+import edu.wpi.first.wpilibj.Relay;
+
+import edu.wpi.first.wpilibj.RobotDrive;
+
+import edu.wpi.first.wpilibj.SimpleRobot;
+
+import edu.wpi.first.wpilibj.Timer;
+
+import edu.wpi.first.wpilibj.can.CANTimeoutException;
+
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+
+import java.io.DataInputStream;
+
+import java.io.IOException;
+
+import javax.microedition.io.Connector;
+
+import javax.microedition.io.SocketConnection;
+
+
+
+
+public class RobotTemplate extends SimpleRobot {
+
+    
+
+    private static final double SOLENOID_DELAY = 1.5, RAIL_LIMIT = 2.0;
+
+    private static final int PORT = 4444;
+
+    private static final String HOST_IP = "10.23.67.8";
+
+    private static final int BUTTON_Y = 4;
+
+    private static final int BUTTON_B = 2;
+
+    private static final int BUTTON_A = 1;
+
+    private static final int BUTTON_X = 3;
+
+    private static final int BUMPER_LEFT = 5;
+
+    private static final int BUMPER_RIGHT = 6;
+
+    private static final int THUMBSTICK_LEFT_X = 1;
+
+    private static final int THUMBSTICK_LEFT_Y = 2;    
+
+    private static final int THUMBSTICK_RIGHT_X = 4; 
+
+     private static final int THUMBSTICK_RIGHT_Y = 5;
+
+    private static final int TRIGGERS = 3;
+
+    
+
+    private CANJaguar shootAngle, shootLifter, railLifter, shootAngle2;
+
+    private CANJaguar leftFront, leftRear, rightFront, rightRear;
+
+    private DoubleSolenoid solenoid, solenoid2, solenoid3, latch, blockMode;
+
+    private Compressor compress;
+
+    private Joystick joys, joys2;
+
+    private RobotDrive robodr;
+
+    private double stopTime, startTime, shootTime, forkAngle,shootAcid,shootheight;
+
+    private boolean isSliderFullAuto;
+
+    private Gyro gyro;
+
+    private SocketConnection client; 
+
+    private DataInputStream reader;
+
+    
+
+    protected void robotInit() {
+
+        CANLoad(leftFront,2);
+
+        CANLoad(leftRear,4);
+
+        CANLoad(rightFront,3);
+
+        CANLoad(rightRear,5);
+
+        CANLoad(shootAngle,6);
+
+        CANLoad(shootLifter,8);
+
+        CANLoad(railLifter,7);
+
+        CANLoad(shootAngle2,9);
+
+        solenoid = new DoubleSolenoid(3, 4);
+
+        solenoid2 = new DoubleSolenoid(5,6);
+
+        solenoid3= new DoubleSolenoid(7,8);
+
+        robodr = new RobotDrive(leftFront,leftRear,rightFront,rightRear);        
+
+        latch = new DoubleSolenoid(9,10);
+
+        blockMode = new DoubleSolenoid(11,12);
+
+        joys = new Joystick(1);
+
+        joys2 = new Joystick(2);
+
+        gyro= new Gyro(1);//analog port 1
+
+        startTime = Timer.getFPGATimestamp();
+
+        try {
+
+            shootAcid = shootAngle.getPosition();
+
+        } catch (CANTimeoutException ex) {
+
+           // ex.printStackTrace();    
+
+        }
+
+   
+
+           // ex.printStackTrace();    
+
+        
+
+        compress = new Compressor(13,14);
+
+        try {
+
+            client = (SocketConnection) Connector.open("socket://" + HOST_IP + ":" + PORT, Connector.READ, true);
+
+            reader = client.openDataInputStream();
+
+        } catch (IOException e) {
+
+            SmartDashboard.putString("CO-PROCESSOR", "UNABLE TO CONNECT");
+
+        }        
+
+    }   
+
+    
+
+    public void autonomous() {
+
+       // try {
+
+            double autoTime = Timer.getFPGATimestamp() + 1.0;
+
+            while(autoTime>Timer.getFPGATimestamp()) {
+
+                robodr.mecanumDrive_Cartesian(0, 0, 0, gyro.getAngle());
+
+               
+
+            } 
+
+            robodr.mecanumDrive_Cartesian(0, 0, 0, gyro.getAngle());
+
+            try {
+
+                while(!isHot()) {    
+
+                }
+
+            } catch (IOException e) {
+
+                SmartDashboard.putString("CO-PROCESSOR", "INTERRUPTED WHILE READING HOT");
+
+            }  
+
+            latch.set(DoubleSolenoid.Value.kReverse); //change this account for solenoid
+
+            solenoid.set(DoubleSolenoid.Value.kForward);
+
+            solenoid2.set(DoubleSolenoid.Value.kForward);
+
+            latch.set(DoubleSolenoid.Value.kForward);
+
+            solenoid.set(DoubleSolenoid.Value.kReverse);
+
+            solenoid2.set(DoubleSolenoid.Value.kReverse);
+
+            solenoid.set(DoubleSolenoid.Value.kOff);
+
+            solenoid2.set(DoubleSolenoid.Value.kOff);
+
+        //} catch (CANTimeoutException ex) {
+
+        //}
+
+    }
+
+
+
+
+    public void operatorControl() { 
+
+        while(isOperatorControl()) {
+
+            if(Timer.getFPGATimestamp()-startTime >=0.1) {
+
+                driveBase();           
+
+                    try {
+
+                        shootAngle.setX(forkAngle -joys2.getRawAxis(THUMBSTICK_RIGHT_Y)*50);
+
+                    } catch (CANTimeoutException ex) { 
+
+                    }
+
+                try {
+
+                    //try {
+
+                        //blockerLifter.setX(joys2.getRawAxis(5));
+
+                    //} catch (CANTimeoutException ex) {
+
+                    //}
+
+                    forkAngle = shootAngle.getPosition();
+
+                } catch (CANTimeoutException ex) {
+
+                    //ex.printStackTrace();
+
+                }
+
+            startTime = Timer.getFPGATimestamp(); 
+
+            }
+
+            if (joys.getRawButton(BUTTON_A)) {
+
+                latch.set(DoubleSolenoid.Value.kReverse);
+
+                shootTime = Timer.getFPGATimestamp();
+
+            } else if (Timer.getFPGATimestamp()>=shootTime+SOLENOID_DELAY && shootTime>0) {
+
+                solenoid2.set(DoubleSolenoid.Value.kForward);
+
+                solenoid.set(DoubleSolenoid.Value.kForward);
+
+                latch.set(DoubleSolenoid.Value.kForward);
+
+                solenoid.set(DoubleSolenoid.Value.kReverse);
+
+                solenoid.set(DoubleSolenoid.Value.kReverse);
+
+                solenoid.set(DoubleSolenoid.Value.kOff);
+
+                solenoid2.set(DoubleSolenoid.Value.kOff);
+
+                shootTime = -1;                     
+
+            } 
+
+            if(joys.getRawButton(BUMPER_LEFT)){
+
+                try { //if statement to limit movement upt
+
+                    shootLifter.setX(0.85);
+
+                } catch (CANTimeoutException ex) {                    
+
+                }
+
+            } else if(joys.getRawAxis(TRIGGERS)==1) {
+
+                try {//if statement to limit movement upt
+
+                    shootLifter.setX(-0.85);
+
+                } catch (CANTimeoutException ex) {
+
+                }
+
+            } else if (!joys.getRawButton(BUMPER_LEFT)&&joys.getRawAxis(TRIGGERS)!=1){ //do we really need this?
+
+                try {
+
+                    shootLifter.setX(0);
+
+                } catch (CANTimeoutException ex) {                   
+
+                }
+
+            }
+
+            if (joys2.getRawButton(BUTTON_Y)){
+
+                try {
+
+                    if(railLifter.getPosition()<=RAIL_LIMIT) {
+
+                        railLifter.setX(0.85);  
+
+                    } else {
+
+                        railLifter.setX(0);  
+
+                    }
+
+                } catch (CANTimeoutException ex) {               
+
+                }                   
+
+            } else if(joys2.getRawButton(BUTTON_A)) {
+
+                try {
+
+                    if(railLifter.getPosition()>=0) {
+
+                        railLifter.setX(-0.85);  
+
+                    } else {
+
+                    railLifter.setX(0);  
+
+                    }
+
+                } catch (CANTimeoutException ex) {                
+
+                }
+
+            } else if(!joys2.getRawButton(BUTTON_Y)&&!joys.getRawButton(BUTTON_A)) {
+
+                try {
+
+                    railLifter.setX(0);
+
+                } catch (CANTimeoutException ex) {                
+
+                }
+
+            }
+
+            if (joys2.getRawButton(BUMPER_LEFT)) {
+
+               
+
+            } else if (joys2.getRawAxis(TRIGGERS)==1) {
+
+                
+
+            } else if (!joys2.getRawButton(BUMPER_LEFT)&&joys2.getRawAxis(TRIGGERS)!=1){
+
+                
+
+            }
+
+            if (joys2.getRawButton(BUTTON_X)) {
+
+                isSliderFullAuto = true;
+
+            } else if (joys2.getRawButton(BUTTON_B)) {
+
+                isSliderFullAuto = false;
+
+            }
+
+            if (joys2.getRawButton(BUMPER_RIGHT)) {
+
+                compress.start();
+
+            } else if (!joys2.getRawButton(BUMPER_RIGHT)) {
+
+                compress.stop();
+
+            }                           
+
+        }        
+
+        try {
+
+            reader.close();
+
+            client.close();
+
+        } catch (IOException e) {
+
+            SmartDashboard.putString("CO-PROCESSOR", "INTERRUPT WHILE CLOSING");
+
+        }
+
+        }
+
+    
+
+    public void test() {    
+
+    }
+
+    
+
+    private void CANLoad(CANJaguar jaguar, int port) {
+
+        try {
+
+            jaguar = new CANJaguar(port);
+
+            jaguar.changeControlMode(CANJaguar.ControlMode.kSpeed);
+
+            jaguar.setPID(0.5,0.05,0.02);
+
+            jaguar.setSpeedReference(CANJaguar.SpeedReference.kQuadEncoder);
+
+            jaguar.configEncoderCodesPerRev(360);
+
+        } catch (CANTimeoutException ex) {
+
+        }
+
+    }
+
+     
+
+    private void driveBase() { 
+
+        double x = -joys.getRawAxis(THUMBSTICK_LEFT_X);
+
+        double y = -joys.getRawAxis(THUMBSTICK_LEFT_Y);
+
+        double rotation = -joys.getRawAxis(THUMBSTICK_RIGHT_X);
+
+        if(Math.abs(x)<=0.1) {
+
+            x = 0;
+
+        }
+
+        if (Math.abs(y)<=0.1) {
+
+            y = 0;
+
+        }
+
+        if (Math.abs(rotation)<=0.1) {
+
+            rotation = 0;
+
+        }
+
+        robodr.mecanumDrive_Cartesian(x, rotation, y, gyro.getAngle());
+
+        getWatchdog().feed();
+
+    }
+
+    
+
+    private boolean isHot() throws IOException
+
+    {
+
+        return reader.readBoolean();
+
+    }    
+
+    
+
+    private void shootBallOverTruss() {         
+
+    }
+
+}
